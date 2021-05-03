@@ -193,7 +193,12 @@ try:
                 plt_mod = 'lines'
             fig.add_trace(go.Scatter(x=subdf['Date'], y=subdf['Electricity Price $/kwh'], mode = plt_mod, name = p))
             fig.update_yaxes(type='log')
-            fig.update_layout(width = 900)
+            fig.update_layout(width = 900,
+                              title = 'Prediction and Historical Prices',
+                              xaxis_title = 'Date',
+                              yaxis_title = 'Electricity Price $/kwh',
+                              legend_title = 'Plot Data Sources',
+                              font = dict(family='Courier New, monospace',size=15,color='RebeccaPurple'))
         st.write('Alberta Electricity Demand History')
         st.plotly_chart(fig, use_container_width=False)
        
