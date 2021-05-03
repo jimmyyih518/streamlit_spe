@@ -115,7 +115,7 @@ try:
     # dateupdate = st.button('Update Plot Time Range')
     # #streamlit input for user's input electricity price quote
     st.sidebar.write('Enter your quoted electricity price below in $/kwh')
-    user_priceinput = st.sidebar.number_input('Price')
+    user_priceinput = st.sidebar.number_input('Price', value = 0.05)
     st.sidebar.write(f'Your price is {user_priceinput} $/kwh')
     #streamlit input for user's input electricity price quote period
     st.sidebar.write('Enter your electricity price lock-in time')
@@ -149,9 +149,11 @@ try:
         user_cost = 7300*user_priceinput*user_locktime_int
         cost_diff = round(df_calcs['CumCost'].max() - user_cost, 2)
         if cost_diff > 0:
-            st.write(f'Your Quote is predicted to save ${abs(cost_diff)} dollars compared to variable price over {user_locktime_int} years')
+            out_txt = f'Your Quote is predicted to save ${abs(cost_diff)} dollars compared to variable price over {user_locktime_int} years'
+            st.markdown(f'<font color="green">{out_txt}</font>', unsafe_allow_html=True)
         else:
-            st.write(f'Your Quote is predicted to cost ${abs(cost_diff)} more dollars compared to variable price over {user_locktime_int} years')
+            out_txt = f'Your Quote is predicted to cost ${abs(cost_diff)} more dollars compared to variable price over {user_locktime_int} years'
+            st.markdown(f'<font color="red">{out_txt}</font>', unsafe_allow_html=True)
         
         #write a header line and dataframe for visualization
         # st.write("AESO Historical Data", df)
