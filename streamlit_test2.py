@@ -19,6 +19,7 @@ import plotly.graph_objects as go
 from plotly.offline import plot
 from plotly.subplots import make_subplots
 
+#https://docs.google.com/spreadsheets/d/1nf6qwqHwficHPX4gB0mMJtEm3YE31VJHgJtZ8teJJGI/edit?usp=sharing
 #@st.cache
 #d2 = pd.read_csv('aeso_hpp.csv')
 #d2 = d2.drop(d2.columns[0], axis = 1)
@@ -41,9 +42,10 @@ def get_data(sheet_id, sheet_range):
     #download google sheet with sheet id and excel style range (everything in string format)
     df = Gsheet_Download(aeso_hpp_id, sheet_range)
     #convert datetime column to appropriate format
-    df['Date (HE)'] = df['Date (HE)'].apply(pd.to_datetime)
+    df['DATETIME'] = df['DATETIME'].apply(pd.to_datetime)
     #convert numerical columns to appropriate format
-    num_cols = ['Price ($)', '30Ravg ($)', 'AIL Demand (MW)']
+    #num_cols = ['Price ($)', '30Ravg ($)', 'AIL Demand (MW)']
+    num_cols = ['PRICE']
     df[num_cols] = df[num_cols].apply(pd.to_numeric, errors = 'coerce')
     # if df.columns.values[0] == 'Unnamed: 0':
     #     df.columns.values[0] = 'RowID'
@@ -54,13 +56,13 @@ def get_data(sheet_id, sheet_range):
 #function to append new data to google sheet
 def append_newdata(data, sheetid, sheet_range):
     #get max date available in downloaded google sheet data
-    maxdate = max(data['Date (HE)'])
+    maxdate = max(data['DATETIME'])
     #get current date time
     currdate = datetime.datetime.now()
     dateformat = '%Y-%m-%d'
     
     #use existing scrape functions to get new data if current date < maxdate in google sheet
-    if maxdate < currdate:
+    if maxdate < currdate - datetime.timedelta(days=2):
         #call scrape function from electricity_scrape
         append_data = aeso_download_range('HistoricalPoolPrice', 'html',  maxdate.strftime(dateformat),  currdate.strftime(dateformat), dateformat)
         #convert column types
@@ -68,38 +70,48 @@ def append_newdata(data, sheetid, sheet_range):
         num_cols = ['Price ($)', '30Ravg ($)', 'AIL Demand (MW)']
         append_data[num_cols] = append_data[num_cols].apply(pd.to_numeric, errors='coerce')
         #append together new scraped data with historical data from google sheet
-        data2 = data.append(append_data).reset_index(drop=True).drop_duplicates().sort_values('Date (HE)')
+        append_data2 = append_data[['Date (HE)', 'Price ($)']]
+        append_data2.columns = ['DATETIME','PRICE']
+        data2 = data.append(append_data2).reset_index(drop=True).drop_duplicates(subset='DATETIME', keep='last').sort_values('DATETIME')
+        
         #convert everything to string to prepare for google sheet upload
-        upload_data = append_data.applymap(str)
+        upload_data = data2.copy()
+        upload_data['Date'] = upload_data['DATETIME'].dt.date
+        upload_data_sum = upload_data.groupby('Date').agg({'PRICE':'mean'}).reset_index()
+        upload_data_sum.columns = ['DATETIME','PRICE']
         #Gsheet_Append(upload_data, sheetid, sheet_range)
         #upload new data to replace all data in google sheet
-        Gsheet_updateAll(data2.applymap(str), sheetid, sheet_range)
-        print(str(upload_data.shape[0]) + ' rows added to google sheet data')
+        Gsheet_updateAll(upload_data_sum.applymap(str), sheetid, sheet_range)
+        print(str(upload_data_sum.shape[0]) + ' rows added to google sheet data')
         
     else:
         data2 = data.copy()
     return data2
 
+
 # def Gen_Pred_df(model, data):
 #     currdate = datetime.datetime.now()
 #     maxdate = max(data['Date (HE)'])
 df_preds = pd.read_parquet('combine_preds2.parquet')    
-
+df_preds['Date'] = df_preds['Date'].apply(pd.to_datetime)
 try:
     #google sheet id for electricity prices and demand (from Historical Pool Price)
+    aeso_hpp_id = '1nf6qwqHwficHPX4gB0mMJtEm3YE31VJHgJtZ8teJJGI'
     #aeso_hpp_id = '1sRkTyY8jlv-NGizn-0ulBSIgIjQmVvpBVnofy49-NPM'
     #define max sheet ranges to look for data in google sheet
-    #sheet_range = 'A1:AA1000000'
+    sheet_range = 'A1:AA1000000'
     #get data from google sheet
-    #data_gsheet = get_data(aeso_hpp_id, sheet_range)
+    data_gsheet = get_data(aeso_hpp_id, sheet_range)
     #check if new data needs to be appended to google sheet
-    #data_new = append_newdata(data_gsheet, aeso_hpp_id, sheet_range)
+    data_new = append_newdata(data_gsheet, aeso_hpp_id, sheet_range)
     #clean and sort data
-    #data = data_new.reset_index(drop=True).drop_duplicates().sort_values('Date (HE)')
-    data = df_preds.copy()
+    data_new2 = data_new.reset_index(drop=True).drop_duplicates().sort_values('DATETIME')
+    data_new2.columns = ['Date', 'Predicted Price $']
+    data_new2['Data Source'] = 'AESO_HPP_Historical'
+    data = df_preds.append(data_new2).sort_values(['Data Source', 'Date']).reset_index(drop=True)
     data_models = data['Data Source'].unique().tolist()
     data_models.remove('AESO_HPP_Historical')
-    data['Date'] = data['Date'].apply(pd.to_datetime)
+    #data['Date'] = data['Date'].apply(pd.to_datetime)
     data['Electricity Price $/kwh'] = data['Predicted Price $'] / 1000
     #data = data.rename(columns={'Date (HE)':'Date'})
     #data['Date'] = data['Date'].apply(pd.to_datetime)
