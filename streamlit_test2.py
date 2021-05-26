@@ -53,6 +53,10 @@ def get_data(sheet_id, sheet_range):
     #     df['RowID'] = df.index+1
     return df
 
+def uca_price_conversion(price):
+    consumer_price = 1.1104*price/1000 + 0.0116
+    return consumer_price
+
 #function to append new data to google sheet
 def append_newdata(data, sheetid, sheet_range):
     #get max date available in downloaded google sheet data
@@ -112,7 +116,7 @@ try:
     data_models = data['Data Source'].unique().tolist()
     data_models.remove('AESO_HPP_Historical')
     #data['Date'] = data['Date'].apply(pd.to_datetime)
-    data['Electricity Price $/kwh'] = data['Predicted Price $'] / 1000
+    data['Electricity Price $/kwh'] = uca_price_conversion(data['Predicted Price $'])
     #data = data.rename(columns={'Date (HE)':'Date'})
     #data['Date'] = data['Date'].apply(pd.to_datetime)
     
@@ -206,6 +210,7 @@ try:
             else:
                 plt_mod = 'lines'
             fig.add_trace(go.Scatter(x=subdf['Date'], y=subdf['Electricity Price $/kwh'], mode = plt_mod, name = p))
+            fig.add_hline(y=user_priceinput)
             fig.update_yaxes(type='log')
             fig.update_layout(width = 900,
                               title = 'Prediction and Historical Prices',
